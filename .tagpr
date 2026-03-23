@@ -5,3 +5,4 @@
 	release = draft
 	changelog = false
 	calendarVersioning = YYYY.MM.MICRO
+	command = "mise run prerelease"
