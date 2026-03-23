@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "skills": {
+    "skill-github": {
+      "source": "h3y6e/spec-skills",
+      "sourceType": "github",
+      "computedHash": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+    },
+    "skill-gitlab": {
+      "source": "h3y6e/repo",
+      "sourceType": "gitlab",
+      "computedHash": "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3"
+    },
+    "skill-git": {
+      "source": "https://git.example.com/team/skills.git",
+      "sourceType": "git",
+      "computedHash": "c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+    },
+    "skill-local": {
+      "source": "/home/user/my-skills",
+      "sourceType": "local",
+      "computedHash": "d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5"
+    },
+    "skill-well-known": {
+      "source": "mintlify/docs",
+      "sourceType": "well-known",
+      "computedHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "skill-node-modules": {
+      "source": "my-npm-pkg",
+      "sourceType": "node_modules",
+      "computedHash": "7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069"
+    }
+  }
+}

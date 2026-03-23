@@ -1,0 +1,112 @@
+package skill_test
+
+import (
+	"testing"
+
+	"github.com/h3y6e/skills/internal/skill"
+)
+
+func TestParseSource(t *testing.T) {
+	tests := []struct {
+		name    string
+		raw     string
+		want    skill.SourceRef
+		wantErr bool
+	}{
+		{
+			name: "github shorthand",
+			raw:  "h3y6e/spec-skills",
+			want: skill.SourceRef{
+				Raw:             "h3y6e/spec-skills",
+				SourceType:      "github",
+				CanonicalSource: "h3y6e/spec-skills",
+				CloneURL:        "https://github.com/h3y6e/spec-skills.git",
+			},
+		},
+		{
+			name: "github https url",
+			raw:  "https://github.com/h3y6e/spec-skills",
+			want: skill.SourceRef{
+				Raw:             "https://github.com/h3y6e/spec-skills",
+				SourceType:      "github",
+				CanonicalSource: "h3y6e/spec-skills",
+				CloneURL:        "https://github.com/h3y6e/spec-skills.git",
+			},
+		},
+		{
+			name: "gitlab https url",
+			raw:  "https://gitlab.com/h3y6e/repo",
+			want: skill.SourceRef{
+				Raw:             "https://gitlab.com/h3y6e/repo",
+				SourceType:      "gitlab",
+				CanonicalSource: "h3y6e/repo",
+				CloneURL:        "https://gitlab.com/h3y6e/repo.git",
+			},
+		},
+		{
+			name: "github ssh url",
+			raw:  "git@github.com:h3y6e/spec-skills.git",
+			want: skill.SourceRef{
+				Raw:             "git@github.com:h3y6e/spec-skills.git",
+				SourceType:      "github",
+				CanonicalSource: "h3y6e/spec-skills",
+				CloneURL:        "git@github.com:h3y6e/spec-skills.git",
+			},
+		},
+		{
+			name: "generic git url",
+			raw:  "ssh://git@example.com/team/skills.git",
+			want: skill.SourceRef{
+				Raw:             "ssh://git@example.com/team/skills.git",
+				SourceType:      "git",
+				CanonicalSource: "ssh://git@example.com/team/skills.git",
+				CloneURL:        "ssh://git@example.com/team/skills.git",
+			},
+		},
+		{
+			name: "self-hosted https url",
+			raw:  "https://gitea.example.com/org/repo",
+			want: skill.SourceRef{
+				Raw:             "https://gitea.example.com/org/repo",
+				SourceType:      "git",
+				CanonicalSource: "https://gitea.example.com/org/repo",
+				CloneURL:        "https://gitea.example.com/org/repo",
+			},
+		},
+		{
+			name:    "invalid source",
+			raw:     "not a source",
+			wantErr: true,
+		},
+		{
+			name: "file url for local testing",
+			raw:  "file:///tmp/bare-repo",
+			want: skill.SourceRef{
+				Raw:             "file:///tmp/bare-repo",
+				SourceType:      "git",
+				CanonicalSource: "file:///tmp/bare-repo",
+				CloneURL:        "file:///tmp/bare-repo",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := skill.ParseSource(tt.raw)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("ParseSource() error = nil, want non-nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("ParseSource() error = %v", err)
+			}
+
+			if got != tt.want {
+				t.Fatalf("ParseSource() = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}

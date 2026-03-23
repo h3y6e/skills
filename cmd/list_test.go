@@ -1,0 +1,199 @@
+package cmd_test
+
+import (
+	"bytes"
+	"encoding/json"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/h3y6e/skills/cmd"
+	"github.com/h3y6e/skills/internal/lock"
+)
+
+func TestListFlags(t *testing.T) {
+	t.Parallel()
+
+	root := cmd.NewRootCmd("test")
+	listCmd, _, _ := root.Find([]string{"list"})
+
+	t.Run("--json flag is registered", func(t *testing.T) {
+		t.Parallel()
+		flag := listCmd.Flags().Lookup("json")
+		if flag == nil {
+			t.Fatal("expected --json flag on list command")
+		}
+	})
+}
+
+func TestListAlias(t *testing.T) {
+	t.Parallel()
+
+	bareURL := initBareRepo(t, map[string]string{
+		"skills/alpha/SKILL.md": "# Alpha\n",
+	})
+
+	destDir := filepath.Join(t.TempDir(), ".agents", "skills")
+
+	// Install.
+	root1 := cmd.NewRootCmd("test")
+	root1.SetArgs([]string{"add", "-d", destDir, bareURL})
+	if err := root1.Execute(); err != nil {
+		t.Fatalf("add error: %v", err)
+	}
+
+	// Use ls alias.
+	var out bytes.Buffer
+	root2 := cmd.NewRootCmd("test")
+	root2.SetOut(&out)
+	root2.SetArgs([]string{"ls", "-d", destDir})
+	if err := root2.Execute(); err != nil {
+		t.Fatalf("ls error: %v", err)
+	}
+
+	got := out.String()
+	if !strings.Contains(got, "alpha") {
+		t.Errorf("ls should list alpha, got: %q", got)
+	}
+}
+
+func TestListHuman(t *testing.T) {
+	t.Parallel()
+
+	t.Run("lists installed skills", func(t *testing.T) {
+		t.Parallel()
+
+		bareURL := initBareRepo(t, map[string]string{
+			"skills/alpha/SKILL.md": "# Alpha\n",
+			"skills/beta/SKILL.md":  "# Beta\n",
+		})
+
+		destDir := filepath.Join(t.TempDir(), ".agents", "skills")
+
+		root1 := cmd.NewRootCmd("test")
+		root1.SetArgs([]string{"add", "-d", destDir, bareURL})
+		if err := root1.Execute(); err != nil {
+			t.Fatalf("add error: %v", err)
+		}
+
+		var out bytes.Buffer
+		root2 := cmd.NewRootCmd("test")
+		root2.SetOut(&out)
+		root2.SetArgs([]string{"list", "-d", destDir})
+		if err := root2.Execute(); err != nil {
+			t.Fatalf("list error: %v", err)
+		}
+
+		got := out.String()
+		if !strings.Contains(got, "alpha") {
+			t.Errorf("expected alpha in output, got: %q", got)
+		}
+		if !strings.Contains(got, "beta") {
+			t.Errorf("expected beta in output, got: %q", got)
+		}
+	})
+
+	t.Run("empty lockfile shows no skills message", func(t *testing.T) {
+		t.Parallel()
+
+		destDir := filepath.Join(t.TempDir(), ".agents", "skills")
+
+		lf := lock.File{Version: 1, Skills: map[string]lock.Entry{}}
+		lock.WriteFile(lock.FilePath(destDir), lf)
+
+		var out bytes.Buffer
+		root := cmd.NewRootCmd("test")
+		root.SetOut(&out)
+		root.SetArgs([]string{"list", "-d", destDir})
+		if err := root.Execute(); err != nil {
+			t.Fatalf("list error: %v", err)
+		}
+
+		got := out.String()
+		if !strings.Contains(got, "no") {
+			t.Errorf("expected 'no ...' message for empty lockfile, got: %q", got)
+		}
+	})
+
+	t.Run("missing lockfile returns error", func(t *testing.T) {
+		t.Parallel()
+
+		destDir := filepath.Join(t.TempDir(), ".agents", "skills")
+		root := cmd.NewRootCmd("test")
+		root.SetArgs([]string{"list", "-d", destDir})
+		err := root.Execute()
+		if err == nil {
+			t.Fatal("expected error when lockfile missing")
+		}
+	})
+}
+
+func TestListJSON(t *testing.T) {
+	t.Parallel()
+
+	bareURL := initBareRepo(t, map[string]string{
+		"skills/alpha/SKILL.md": "# Alpha\n",
+	})
+
+	destDir := filepath.Join(t.TempDir(), ".agents", "skills")
+
+	root1 := cmd.NewRootCmd("test")
+	root1.SetArgs([]string{"add", "-d", destDir, bareURL})
+	if err := root1.Execute(); err != nil {
+		t.Fatalf("add error: %v", err)
+	}
+
+	var out bytes.Buffer
+	root2 := cmd.NewRootCmd("test")
+	root2.SetOut(&out)
+	root2.SetArgs([]string{"list", "--json", "-d", destDir})
+	if err := root2.Execute(); err != nil {
+		t.Fatalf("list --json error: %v", err)
+	}
+
+	var results []map[string]any
+	if err := json.Unmarshal(out.Bytes(), &results); err != nil {
+		t.Fatalf("invalid JSON: %v\nraw: %s", err, out.String())
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	r := results[0]
+	if r["skillName"] != "alpha" {
+		t.Errorf("skillName = %v, want alpha", r["skillName"])
+	}
+
+	// Must have required fields.
+	for _, field := range []string{"skillName", "source", "sourceType", "computedHash"} {
+		if _, ok := r[field]; !ok {
+			t.Errorf("missing required JSON field %q", field)
+		}
+	}
+}
+
+func TestListJSONEmpty(t *testing.T) {
+	t.Parallel()
+
+	destDir := filepath.Join(t.TempDir(), ".agents", "skills")
+	lf := lock.File{Version: 1, Skills: map[string]lock.Entry{}}
+	lock.WriteFile(lock.FilePath(destDir), lf)
+
+	var out bytes.Buffer
+	root := cmd.NewRootCmd("test")
+	root.SetOut(&out)
+	root.SetArgs([]string{"list", "--json", "-d", destDir})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("list --json error: %v", err)
+	}
+
+	var results []map[string]any
+	if err := json.Unmarshal(out.Bytes(), &results); err != nil {
+		t.Fatalf("invalid JSON: %v\nraw: %s", err, out.String())
+	}
+
+	if len(results) != 0 {
+		t.Errorf("expected empty array, got %d items", len(results))
+	}
+}
