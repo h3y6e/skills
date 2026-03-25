@@ -3,6 +3,7 @@ package skill_test
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/h3y6e/skills/internal/lock"
 	"github.com/h3y6e/skills/internal/skill"
@@ -341,6 +342,78 @@ func TestAggregateUpdateCandidates(t *testing.T) {
 		}
 		if candidates[1].SkillName != "zeta" {
 			t.Errorf("second = %q, want 'zeta'", candidates[1].SkillName)
+		}
+	})
+
+	t.Run("processes multiple sources concurrently", func(t *testing.T) {
+		t.Parallel()
+
+		srcA := t.TempDir()
+		srcB := t.TempDir()
+
+		writeFiles(t, srcA, map[string]string{
+			"skills/alpha/SKILL.md": "# Alpha\n",
+		})
+		writeFiles(t, srcB, map[string]string{
+			"skills/beta/SKILL.md": "# Beta\n",
+		})
+
+		entries := map[string]lock.Entry{
+			"alpha": {Source: "h3y6e/skills-a", SourceType: "github", ComputedHash: "stale-a"},
+			"beta":  {Source: "h3y6e/skills-b", SourceType: "github", ComputedHash: "stale-b"},
+		}
+
+		cloneDirs := map[string]string{
+			"h3y6e/skills-a": srcA,
+			"h3y6e/skills-b": srcB,
+		}
+		started := make(chan string, len(cloneDirs))
+		release := make(chan struct{})
+
+		cloneFn := func(source string) (string, error) {
+			dir, ok := cloneDirs[source]
+			if !ok {
+				t.Fatalf("unexpected clone for source %q", source)
+			}
+
+			started <- source
+			<-release
+			return dir, nil
+		}
+
+		done := make(chan struct{})
+		var (
+			candidates []skill.UpdateCandidate
+			err        error
+		)
+		go func() {
+			candidates, _, err = skill.AggregateUpdateCandidates(entries, cloneFn)
+			close(done)
+		}()
+
+		seen := map[string]bool{}
+		for len(seen) < len(cloneDirs) {
+			select {
+			case source := <-started:
+				seen[source] = true
+			case <-time.After(200 * time.Millisecond):
+				t.Fatalf("expected %d concurrent clone starts, got %d", len(cloneDirs), len(seen))
+			}
+		}
+
+		close(release)
+
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("AggregateUpdateCandidates() did not finish")
+		}
+
+		if err != nil {
+			t.Fatalf("AggregateUpdateCandidates() error = %v", err)
+		}
+		if len(candidates) != 2 {
+			t.Fatalf("expected 2 candidates, got %d", len(candidates))
 		}
 	})
 
