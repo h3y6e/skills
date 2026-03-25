@@ -3,11 +3,13 @@ package skill
 import (
 	"cmp"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 )
 
 // DiscoverSkills finds skills in a cloned repository.
@@ -29,12 +31,21 @@ func DiscoverSkills(repoRoot string) ([]DiscoveredSkill, error) {
 }
 
 func scanDir(dir string) ([]DiscoveredSkill, error) {
+	return scanDirWithHashFunc(dir, ComputeHash)
+}
+
+func scanDirWithHashFunc(dir string, hashFn func(string) (string, error)) ([]DiscoveredSkill, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
 
-	var skills []DiscoveredSkill
+	type skillTarget struct {
+		name string
+		dir  string
+	}
+
+	targets := make([]skillTarget, 0, len(entries))
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -50,16 +61,55 @@ func scanDir(dir string) ([]DiscoveredSkill, error) {
 			return nil, fmt.Errorf("stat SKILL.md in %q: %w", skillDir, err)
 		}
 
-		hash, err := ComputeHash(skillDir)
-		if err != nil {
-			return nil, err
-		}
+		targets = append(targets, skillTarget{name: name, dir: skillDir})
+	}
 
-		skills = append(skills, DiscoveredSkill{
-			Name:         name,
-			Dir:          skillDir,
-			ComputedHash: hash,
-		})
+	type scanResult struct {
+		skill DiscoveredSkill
+		err   error
+	}
+
+	results := make(chan scanResult, len(targets))
+	var wg sync.WaitGroup
+
+	for _, target := range targets {
+		target := target
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			hash, err := hashFn(target.dir)
+			if err != nil {
+				results <- scanResult{err: err}
+				return
+			}
+
+			results <- scanResult{
+				skill: DiscoveredSkill{
+					Name:         target.name,
+					Dir:          target.dir,
+					ComputedHash: hash,
+				},
+			}
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	skills := make([]DiscoveredSkill, 0, len(targets))
+	var errs []error
+	for result := range results {
+		if result.err != nil {
+			errs = append(errs, result.err)
+			continue
+		}
+		skills = append(skills, result.skill)
+	}
+	if err := errors.Join(errs...); err != nil {
+		return nil, err
 	}
 
 	slices.SortFunc(skills, func(a, b DiscoveredSkill) int {

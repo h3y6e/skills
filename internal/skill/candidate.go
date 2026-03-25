@@ -3,9 +3,11 @@ package skill
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
+	"sync"
 
 	"github.com/h3y6e/skills/internal/git"
 	"github.com/h3y6e/skills/internal/lock"
@@ -130,20 +132,47 @@ func AggregateUpdateCandidates(entries map[string]lock.Entry, cloneFn CloneFunc)
 	}
 
 	bySource := groupEntriesBySource(supported)
+	results := make(chan aggregateResult, len(bySource))
+	var wg sync.WaitGroup
+
+	for source, group := range bySource {
+		source, group := source, group
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			cloneDir, err := cloneFn(source)
+			if err != nil {
+				results <- aggregateResult{err: fmt.Errorf("clone source %q: %w", source, err)}
+				return
+			}
+
+			upstream, err := DiscoverSkills(cloneDir)
+			if err != nil {
+				results <- aggregateResult{err: fmt.Errorf("discover skills in %q: %w", source, err)}
+				return
+			}
+
+			results <- aggregateResult{candidates: ResolveUpdateCandidates(group, upstream)}
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
 
 	var all []UpdateCandidate
-	for source, group := range bySource {
-		cloneDir, err := cloneFn(source)
-		if err != nil {
-			return nil, skipped, fmt.Errorf("clone source %q: %w", source, err)
+	var errs []error
+	for result := range results {
+		if result.err != nil {
+			errs = append(errs, result.err)
+			continue
 		}
-
-		upstream, err := DiscoverSkills(cloneDir)
-		if err != nil {
-			return nil, skipped, fmt.Errorf("discover skills in %q: %w", source, err)
-		}
-
-		all = append(all, ResolveUpdateCandidates(group, upstream)...)
+		all = append(all, result.candidates...)
+	}
+	if err := errors.Join(errs...); err != nil {
+		return nil, skipped, err
 	}
 
 	sortCandidates(all)
@@ -154,6 +183,7 @@ func AggregateUpdateCandidates(entries map[string]lock.Entry, cloneFn CloneFunc)
 // and a cleanup function that removes all created temp directories.
 func NewCloneFunc(ctx context.Context, prefix string) (CloneFunc, func()) {
 	var dirs []string
+	var mu sync.Mutex
 
 	cloneFn := func(source string) (string, error) {
 		ref, err := ParseSource(source)
@@ -168,17 +198,28 @@ func NewCloneFunc(ctx context.Context, prefix string) (CloneFunc, func()) {
 			os.RemoveAll(tmpDir)
 			return "", err
 		}
+		mu.Lock()
 		dirs = append(dirs, tmpDir)
+		mu.Unlock()
 		return tmpDir, nil
 	}
 
 	cleanup := func() {
-		for _, d := range dirs {
+		mu.Lock()
+		cleanupDirs := append([]string(nil), dirs...)
+		mu.Unlock()
+
+		for _, d := range cleanupDirs {
 			os.RemoveAll(d)
 		}
 	}
 
 	return cloneFn, cleanup
+}
+
+type aggregateResult struct {
+	candidates []UpdateCandidate
+	err        error
 }
 
 func sortCandidates(c []UpdateCandidate) {
