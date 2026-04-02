@@ -93,7 +93,10 @@ func NewLayout(destDir string) Layout {
 }
 
 func (l Layout) LockPath() string {
-	return filepath.Join(filepath.Dir(filepath.Dir(l.DestDir)), FileName)
+	if filepath.IsAbs(l.DestDir) {
+		return filepath.Join(filepath.Dir(filepath.Dir(l.DestDir)), FileName)
+	}
+	return FileName
 }
 
 func (l Layout) SkillDir(name string) string {
