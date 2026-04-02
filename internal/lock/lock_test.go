@@ -13,6 +13,21 @@ import (
 //go:embed testdata/skills-lock.json
 var lockFixture []byte
 
+func TestLockPathRelativeAlwaysAtCWD(t *testing.T) {
+	cases := []string{
+		filepath.Join(".agents", "skills"),
+		filepath.Join("a", "b"),
+		filepath.Join("a", "b", "c"),
+		filepath.Join("a", "b", "c", "d"),
+	}
+	for _, destDir := range cases {
+		l := lock.NewLayout(destDir)
+		if got := l.LockPath(); got != lock.FileName {
+			t.Errorf("LockPath(%q) = %q, want %q", destDir, got, lock.FileName)
+		}
+	}
+}
+
 func TestReadWriteFileRoundTrip(t *testing.T) {
 	destDir := filepath.Join(t.TempDir(), ".agents", "skills")
 	path := lock.FilePath(destDir)
