@@ -44,3 +44,11 @@ func DiffNoIndex(ctx context.Context, pathA, pathB string) (string, bool, error)
 	}
 	return string(out), false, nil
 }
+
+func IsRepository(ctx context.Context, dir string) bool {
+	cmd, err := gitCommand(ctx, "-C", dir, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return false
+	}
+	return cmd.Run() == nil
+}
