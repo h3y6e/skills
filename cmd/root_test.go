@@ -24,6 +24,7 @@ func TestNewRootCmdRegistersCoreCommands(t *testing.T) {
 		{name: "add"},
 		{name: "check"},
 		{name: "update"},
+		{name: "setup-github-actions"},
 		{name: "list", alias: "ls"},
 		{name: "remove", alias: "rm"},
 	}

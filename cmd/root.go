@@ -22,6 +22,7 @@ func NewRootCmd(version string) *cobra.Command {
 	root.AddCommand(newAddCmd())
 	root.AddCommand(newCheckCmd())
 	root.AddCommand(newUpdateCmd())
+	root.AddCommand(newSetupGitHubActionsCmd())
 	root.AddCommand(newListCmd())
 	root.AddCommand(newRemoveCmd())
 
