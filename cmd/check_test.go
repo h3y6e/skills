@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -135,6 +136,58 @@ func TestCheckHuman(t *testing.T) {
 		}
 		if strings.Contains(got, "@@") {
 			t.Errorf("check should not contain patch markers, got: %q", got)
+		}
+	})
+
+	t.Run("checks only skills installed in the selected dest", func(t *testing.T) {
+		t.Parallel()
+
+		rootDir := t.TempDir()
+		destA := filepath.Join(rootDir, ".agents", "skills")
+		destB := filepath.Join(rootDir, ".config", "opencode", "skills")
+		bareURL := initBareRepo(t, map[string]string{
+			"skills/alpha/SKILL.md": "# Alpha\n",
+			"skills/beta/SKILL.md":  "# Beta\n",
+		})
+
+		lockData := []byte(`{
+		  "version": 1,
+		  "skills": {
+		    "alpha": {
+		      "source": ` + strconv.Quote(bareURL) + `,
+		      "sourceType": "git",
+		      "computedHash": "stale-alpha",
+		      "dest": ` + strconv.Quote(destA) + `
+		    },
+		    "beta": {
+		      "source": ` + strconv.Quote(bareURL) + `,
+		      "sourceType": "git",
+		      "computedHash": "stale-beta",
+		      "dest": ` + strconv.Quote(destB) + `
+		    }
+		  }
+		}`)
+		if err := os.MkdirAll(filepath.Dir(lock.FilePath(destA)), 0o755); err != nil {
+			t.Fatalf("mkdir lockfile parent: %v", err)
+		}
+		if err := os.WriteFile(lock.FilePath(destA), lockData, 0o644); err != nil {
+			t.Fatalf("write lockfile: %v", err)
+		}
+
+		var out bytes.Buffer
+		root := cmd.NewRootCmd("test")
+		root.SetOut(&out)
+		root.SetArgs([]string{"check", "-d", destA})
+		if err := root.Execute(); err != nil {
+			t.Fatalf("check error: %v", err)
+		}
+
+		got := out.String()
+		if !strings.Contains(got, "alpha") {
+			t.Errorf("expected alpha in output, got: %q", got)
+		}
+		if strings.Contains(got, "beta") {
+			t.Errorf("did not expect beta in output for dest %q, got: %q", destA, got)
 		}
 	})
 

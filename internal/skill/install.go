@@ -48,6 +48,7 @@ func InstallSkills(skills []DiscoveredSkill, ref SourceRef, layout lock.Layout) 
 	if err != nil {
 		return err
 	}
+	lf.Skills = lock.NormalizeEntries(lf.Skills, layout.DestDir)
 
 	if err := tx.Apply(); err != nil {
 		return err
@@ -58,6 +59,7 @@ func InstallSkills(skills []DiscoveredSkill, ref SourceRef, layout lock.Layout) 
 			Source:       ref.CanonicalSource,
 			SourceType:   ref.SourceType,
 			ComputedHash: s.ComputedHash,
+			Dest:         filepath.Clean(layout.DestDir),
 		}
 	}
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -94,6 +95,73 @@ func TestUpdateSkillFilter(t *testing.T) {
 		}
 		if strings.Contains(got, "beta") {
 			t.Errorf("output should not mention beta when --skill alpha, got: %q", got)
+		}
+	})
+
+	t.Run("updates only skills installed in the selected dest", func(t *testing.T) {
+		t.Parallel()
+
+		rootDir := t.TempDir()
+		destA := filepath.Join(rootDir, ".agents", "skills")
+		destB := filepath.Join(rootDir, ".config", "opencode", "skills")
+		bareURL := initBareRepo(t, map[string]string{
+			"skills/alpha/SKILL.md": "# Alpha v2\n",
+			"skills/beta/SKILL.md":  "# Beta v2\n",
+		})
+
+		if err := os.MkdirAll(filepath.Join(destA, "alpha"), 0o755); err != nil {
+			t.Fatalf("mkdir alpha: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(destA, "alpha", "SKILL.md"), []byte("# Alpha v1\n"), 0o644); err != nil {
+			t.Fatalf("write alpha: %v", err)
+		}
+
+		lockData := []byte(`{
+		  "version": 1,
+		  "skills": {
+		    "alpha": {
+		      "source": ` + strconv.Quote(bareURL) + `,
+		      "sourceType": "git",
+		      "computedHash": "stale-alpha",
+		      "dest": ` + strconv.Quote(destA) + `
+		    },
+		    "beta": {
+		      "source": ` + strconv.Quote(bareURL) + `,
+		      "sourceType": "git",
+		      "computedHash": "stale-beta",
+		      "dest": ` + strconv.Quote(destB) + `
+		    }
+		  }
+		}`)
+		if err := os.MkdirAll(filepath.Dir(lock.FilePath(destA)), 0o755); err != nil {
+			t.Fatalf("mkdir lockfile parent: %v", err)
+		}
+		if err := os.WriteFile(lock.FilePath(destA), lockData, 0o644); err != nil {
+			t.Fatalf("write lockfile: %v", err)
+		}
+
+		var out bytes.Buffer
+		root := cmd.NewRootCmd("test")
+		root.SetOut(&out)
+		root.SetArgs([]string{"update", "-y", "-d", destA})
+		if err := root.Execute(); err != nil {
+			t.Fatalf("update error: %v", err)
+		}
+
+		got := out.String()
+		if !strings.Contains(got, "alpha: updated") {
+			t.Errorf("expected alpha to be updated, got: %q", got)
+		}
+		if strings.Contains(got, "beta") {
+			t.Errorf("did not expect beta in output for dest %q, got: %q", destA, got)
+		}
+
+		data, err := os.ReadFile(filepath.Join(destA, "alpha", "SKILL.md"))
+		if err != nil {
+			t.Fatalf("read alpha after update: %v", err)
+		}
+		if string(data) != "# Alpha v2\n" {
+			t.Errorf("alpha content = %q, want %q", string(data), "# Alpha v2\n")
 		}
 	})
 

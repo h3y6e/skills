@@ -39,6 +39,7 @@ func TestReadWriteFileRoundTrip(t *testing.T) {
 				Source:       "h3y6e/spec-skills",
 				SourceType:   "github",
 				ComputedHash: "abc123",
+				Dest:         destDir,
 			},
 		},
 	}

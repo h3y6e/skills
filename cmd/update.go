@@ -15,8 +15,9 @@ func runUpdate(cmd *cobra.Command, source string, skillFilter []string, destDir 
 	if err != nil {
 		return err
 	}
+	entriesForDest := lock.FilterEntriesByDest(lf.Skills, layout.DestDir)
 
-	entries, err := filterEntriesBySource(lf.Skills, source)
+	entries, err := filterEntriesBySource(entriesForDest, source)
 	if err != nil {
 		return err
 	}

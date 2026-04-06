@@ -23,6 +23,7 @@ type Entry struct {
 	Source       string `json:"source"`
 	SourceType   string `json:"sourceType"`
 	ComputedHash string `json:"computedHash"`
+	Dest         string `json:"dest,omitempty"`
 }
 
 func ReadFile(path string) (File, error) {
@@ -105,4 +106,36 @@ func (l Layout) SkillDir(name string) string {
 
 func FilePath(destDir string) string {
 	return NewLayout(destDir).LockPath()
+}
+
+func EffectiveDest(entry Entry, fallbackDest string) string {
+	if entry.Dest != "" {
+		return filepath.Clean(entry.Dest)
+	}
+	return filepath.Clean(fallbackDest)
+}
+
+func NormalizeEntries(entries map[string]Entry, fallbackDest string) map[string]Entry {
+	if entries == nil {
+		return map[string]Entry{}
+	}
+
+	normalized := make(map[string]Entry, len(entries))
+	for name, entry := range entries {
+		entry.Dest = EffectiveDest(entry, fallbackDest)
+		normalized[name] = entry
+	}
+
+	return normalized
+}
+
+func FilterEntriesByDest(entries map[string]Entry, destDir string) map[string]Entry {
+	wantDest := filepath.Clean(destDir)
+	filtered := make(map[string]Entry)
+	for name, entry := range NormalizeEntries(entries, destDir) {
+		if entry.Dest == wantDest {
+			filtered[name] = entry
+		}
+	}
+	return filtered
 }

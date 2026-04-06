@@ -3,7 +3,9 @@ package cmd_test
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -22,6 +24,54 @@ func TestListFlags(t *testing.T) {
 		flag := listCmd.Flags().Lookup("json")
 		if flag == nil {
 			t.Fatal("expected --json flag on list command")
+		}
+	})
+
+	t.Run("filters installed skills by dest", func(t *testing.T) {
+		t.Parallel()
+
+		rootDir := t.TempDir()
+		destA := filepath.Join(rootDir, ".agents", "skills")
+		destB := filepath.Join(rootDir, ".config", "opencode", "skills")
+
+		lockData := []byte(`{
+		  "version": 1,
+		  "skills": {
+		    "alpha": {
+		      "source": "h3y6e/spec-skills",
+		      "sourceType": "github",
+		      "computedHash": "abc123",
+		      "dest": ` + strconv.Quote(destA) + `
+		    },
+		    "beta": {
+		      "source": "h3y6e/spec-skills",
+		      "sourceType": "github",
+		      "computedHash": "def456",
+		      "dest": ` + strconv.Quote(destB) + `
+		    }
+		  }
+		}`)
+		if err := os.MkdirAll(filepath.Dir(lock.FilePath(destA)), 0o755); err != nil {
+			t.Fatalf("mkdir lockfile parent: %v", err)
+		}
+		if err := os.WriteFile(lock.FilePath(destA), lockData, 0o644); err != nil {
+			t.Fatalf("write lockfile: %v", err)
+		}
+
+		var out bytes.Buffer
+		root := cmd.NewRootCmd("test")
+		root.SetOut(&out)
+		root.SetArgs([]string{"list", "-d", destA})
+		if err := root.Execute(); err != nil {
+			t.Fatalf("list error: %v", err)
+		}
+
+		got := out.String()
+		if !strings.Contains(got, "alpha") {
+			t.Errorf("expected alpha in output, got: %q", got)
+		}
+		if strings.Contains(got, "beta") {
+			t.Errorf("did not expect beta in output for dest %q, got: %q", destA, got)
 		}
 	})
 }

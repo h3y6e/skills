@@ -183,6 +183,9 @@ func TestAddInstall(t *testing.T) {
 		if !strings.Contains(lockStr, `"alpha"`) {
 			t.Errorf("lockfile should contain alpha entry, got: %s", lockStr)
 		}
+		if !strings.Contains(lockStr, `"dest": `) {
+			t.Errorf("lockfile should persist dest for installed skills, got: %s", lockStr)
+		}
 		if strings.Contains(lockStr, `"beta"`) {
 			t.Errorf("lockfile should not contain beta entry, got: %s", lockStr)
 		}

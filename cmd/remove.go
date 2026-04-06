@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/h3y6e/skills/internal/lock"
 	"github.com/spf13/cobra"
@@ -14,15 +15,16 @@ func runRemove(cmd *cobra.Command, skillNames []string, destDir string) error {
 	if err != nil {
 		return err
 	}
+	entries := lock.FilterEntriesByDest(lf.Skills, layout.DestDir)
 
 	for _, name := range skillNames {
-		if _, ok := lf.Skills[name]; !ok {
-			return fmt.Errorf("skill %q not found in lockfile", name)
+		if _, ok := entries[name]; !ok {
+			return fmt.Errorf("skill %q not found in lockfile for dest %q", name, layout.DestDir)
 		}
 	}
 
 	for _, name := range skillNames {
-		skillDir := layout.SkillDir(name)
+		skillDir := filepath.Join(entries[name].Dest, name)
 		if err := os.RemoveAll(skillDir); err != nil {
 			return fmt.Errorf("remove skill directory %q: %w", name, err)
 		}
