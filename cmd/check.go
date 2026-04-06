@@ -14,8 +14,9 @@ func runCheck(cmd *cobra.Command, destDir string, jsonFlag bool) error {
 	if err != nil {
 		return err
 	}
+	entries := lock.FilterEntriesByDest(lf.Skills, layout.DestDir)
 
-	if len(lf.Skills) == 0 {
+	if len(entries) == 0 {
 		fmt.Fprintln(cmd.OutOrStdout(), "no installed skills to check")
 		return nil
 	}
@@ -23,7 +24,7 @@ func runCheck(cmd *cobra.Command, destDir string, jsonFlag bool) error {
 	cloneFn, cleanup := skill.NewCloneFunc(cmd.Context(), "skills-check-*")
 	defer cleanup()
 
-	candidates, skipped, err := skill.AggregateUpdateCandidates(lf.Skills, cloneFn)
+	candidates, skipped, err := skill.AggregateUpdateCandidates(entries, cloneFn)
 	if err != nil {
 		return err
 	}

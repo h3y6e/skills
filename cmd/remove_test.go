@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/h3y6e/skills/cmd"
@@ -112,6 +113,39 @@ func TestRemove(t *testing.T) {
 		}
 		if _, ok := lf.Skills["beta"]; !ok {
 			t.Error("beta should still be in lockfile after removing alpha")
+		}
+	})
+
+	t.Run("errors when skill exists in a different dest", func(t *testing.T) {
+		t.Parallel()
+
+		rootDir := t.TempDir()
+		destA := filepath.Join(rootDir, ".agents", "skills")
+		destB := filepath.Join(rootDir, ".config", "opencode", "skills")
+
+		lockData := []byte(`{
+		  "version": 1,
+		  "skills": {
+		    "beta": {
+		      "source": "h3y6e/spec-skills",
+		      "sourceType": "github",
+		      "computedHash": "abc123",
+		      "dest": ` + strconv.Quote(destB) + `
+		    }
+		  }
+		}`)
+		if err := os.MkdirAll(filepath.Dir(lock.FilePath(destA)), 0o755); err != nil {
+			t.Fatalf("mkdir lockfile parent: %v", err)
+		}
+		if err := os.WriteFile(lock.FilePath(destA), lockData, 0o644); err != nil {
+			t.Fatalf("write lockfile: %v", err)
+		}
+
+		root := cmd.NewRootCmd("test")
+		root.SetArgs([]string{"remove", "-d", destA, "beta"})
+		err := root.Execute()
+		if err == nil {
+			t.Fatal("expected error when removing skill installed in a different dest")
 		}
 	})
 

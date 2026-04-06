@@ -23,13 +23,14 @@ func runList(cmd *cobra.Command, destDir string, jsonFlag bool) error {
 	if err != nil {
 		return err
 	}
+	entries := lock.FilterEntriesByDest(lf.Skills, layout.DestDir)
 
-	names := slices.Sorted(maps.Keys(lf.Skills))
+	names := slices.Sorted(maps.Keys(entries))
 
 	if jsonFlag {
 		payload := make([]listEntryJSON, 0, len(names))
 		for _, name := range names {
-			entry := lf.Skills[name]
+			entry := entries[name]
 			payload = append(payload, listEntryJSON{
 				SkillName:    name,
 				Source:       entry.Source,
@@ -51,7 +52,7 @@ func runList(cmd *cobra.Command, destDir string, jsonFlag bool) error {
 	}
 
 	for _, name := range names {
-		entry := lf.Skills[name]
+		entry := entries[name]
 		fmt.Fprintf(cmd.OutOrStdout(), "%s  %s  %s\n", name, entry.Source, ShortHash(entry.ComputedHash))
 	}
 	return nil
