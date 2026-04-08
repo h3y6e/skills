@@ -108,32 +108,21 @@ func FilePath(destDir string) string {
 	return NewLayout(destDir).LockPath()
 }
 
-func EffectiveDest(entry Entry, fallbackDest string) string {
+// EffectiveDest returns the entry's dest directory, falling back to
+// DefaultDestDir when the entry has no explicit dest.
+func EffectiveDest(entry Entry) string {
 	if entry.Dest != "" {
 		return filepath.Clean(entry.Dest)
 	}
-	return filepath.Clean(fallbackDest)
+	return filepath.Clean(DefaultDestDir)
 }
 
-func NormalizeEntries(entries map[string]Entry, fallbackDest string) map[string]Entry {
-	if entries == nil {
-		return map[string]Entry{}
-	}
-
-	normalized := make(map[string]Entry, len(entries))
-	for name, entry := range entries {
-		entry.Dest = EffectiveDest(entry, fallbackDest)
-		normalized[name] = entry
-	}
-
-	return normalized
-}
-
+// FilterEntriesByDest returns entries whose effective dest matches destDir.
 func FilterEntriesByDest(entries map[string]Entry, destDir string) map[string]Entry {
 	wantDest := filepath.Clean(destDir)
 	filtered := make(map[string]Entry)
-	for name, entry := range NormalizeEntries(entries, destDir) {
-		if entry.Dest == wantDest {
+	for name, entry := range entries {
+		if EffectiveDest(entry) == wantDest {
 			filtered[name] = entry
 		}
 	}

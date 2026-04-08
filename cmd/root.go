@@ -38,7 +38,6 @@ func loadLockFile(layout lock.Layout) (lock.File, error) {
 	if err != nil {
 		return lock.File{}, fmt.Errorf("read lockfile: %w", err)
 	}
-	lf.Skills = lock.NormalizeEntries(lf.Skills, layout.DestDir)
 	return lf, nil
 }
 

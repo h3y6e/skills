@@ -116,7 +116,7 @@ func TestCheckHuman(t *testing.T) {
 		lf := lock.File{
 			Version: 1,
 			Skills: map[string]lock.Entry{
-				"alpha": {Source: bareURL, SourceType: "git", ComputedHash: "stale"},
+				"alpha": {Source: bareURL, SourceType: "git", ComputedHash: "stale", Dest: destDir},
 			},
 		}
 		lock.WriteFile(lock.FilePath(destDir), lf)
@@ -299,7 +299,7 @@ func TestCheckNonMutating(t *testing.T) {
 	lf := lock.File{
 		Version: 1,
 		Skills: map[string]lock.Entry{
-			"alpha": {Source: bareURL, SourceType: "git", ComputedHash: "stale-hash"},
+			"alpha": {Source: bareURL, SourceType: "git", ComputedHash: "stale-hash", Dest: destDir},
 		},
 	}
 	lockPath := lock.FilePath(destDir)

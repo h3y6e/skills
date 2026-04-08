@@ -24,7 +24,7 @@ func runRemove(cmd *cobra.Command, skillNames []string, destDir string) error {
 	}
 
 	for _, name := range skillNames {
-		skillDir := filepath.Join(entries[name].Dest, name)
+		skillDir := filepath.Join(lock.EffectiveDest(entries[name]), name)
 		if err := os.RemoveAll(skillDir); err != nil {
 			return fmt.Errorf("remove skill directory %q: %w", name, err)
 		}

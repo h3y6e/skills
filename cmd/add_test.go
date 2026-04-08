@@ -280,4 +280,51 @@ func TestAddInstall(t *testing.T) {
 			t.Errorf("error = %q, want containing 'no skills found'", err.Error())
 		}
 	})
+
+	t.Run("does not add dest to existing entries that lack it", func(t *testing.T) {
+		t.Parallel()
+
+		bareURL2 := initBareRepo(t, map[string]string{
+			"skills/delta/SKILL.md": "# Delta\n",
+		})
+
+		destDir := filepath.Join(t.TempDir(), ".agents", "skills")
+
+		// Seed a lockfile with an entry that has no dest field.
+		seedLF := lock.File{
+			Version: 1,
+			Skills: map[string]lock.Entry{
+				"alpha": {Source: bareURL, SourceType: "git", ComputedHash: "abc123"},
+			},
+		}
+		if err := lock.WriteFile(lock.FilePath(destDir), seedLF); err != nil {
+			t.Fatalf("write seed lockfile: %v", err)
+		}
+		// Pre-install alpha directory so the lockfile is consistent.
+		os.MkdirAll(filepath.Join(destDir, "alpha"), 0o755)
+		os.WriteFile(filepath.Join(destDir, "alpha", "SKILL.md"), []byte("# Alpha\n"), 0o644)
+
+		// Add delta from a different source.
+		root := cmd.NewRootCmd("test")
+		root.SetArgs([]string{"add", "-d", destDir, bareURL2})
+		if err := root.Execute(); err != nil {
+			t.Fatalf("add error: %v", err)
+		}
+
+		// Read back lockfile and verify alpha still has no dest.
+		updatedLF, err := lock.ReadFile(lock.FilePath(destDir))
+		if err != nil {
+			t.Fatalf("read lockfile: %v", err)
+		}
+		alphaEntry := updatedLF.Skills["alpha"]
+		if alphaEntry.Dest != "" {
+			t.Errorf("alpha.Dest should remain empty after adding unrelated skill, got %q", alphaEntry.Dest)
+		}
+
+		// delta should have dest set.
+		deltaEntry := updatedLF.Skills["delta"]
+		if deltaEntry.Dest == "" {
+			t.Error("delta.Dest should be set for newly added skill")
+		}
+	})
 }

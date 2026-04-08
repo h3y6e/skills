@@ -154,3 +154,74 @@ func TestReadFileFixture(t *testing.T) {
 		t.Fatalf("JSON round-trip failed: %v", err)
 	}
 }
+
+func TestEffectiveDest(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns entry dest when set", func(t *testing.T) {
+		t.Parallel()
+		entry := lock.Entry{Dest: "custom/path"}
+		if got := lock.EffectiveDest(entry); got != "custom/path" {
+			t.Errorf("EffectiveDest() = %q, want %q", got, "custom/path")
+		}
+	})
+
+	t.Run("returns DefaultDestDir when dest is empty", func(t *testing.T) {
+		t.Parallel()
+		entry := lock.Entry{}
+		if got := lock.EffectiveDest(entry); got != lock.DefaultDestDir {
+			t.Errorf("EffectiveDest() = %q, want %q", got, lock.DefaultDestDir)
+		}
+	})
+}
+
+func TestFilterEntriesByDest(t *testing.T) {
+	t.Parallel()
+
+	entries := map[string]lock.Entry{
+		"alpha": {Source: "src-a", SourceType: "git", ComputedHash: "aaa", Dest: ".agents/skills"},
+		"beta":  {Source: "src-b", SourceType: "git", ComputedHash: "bbb", Dest: "custom/path"},
+		"gamma": {Source: "src-c", SourceType: "git", ComputedHash: "ccc"}, // empty dest → DefaultDestDir
+	}
+
+	t.Run("matches entries with explicit default dest and empty dest", func(t *testing.T) {
+		t.Parallel()
+		got := lock.FilterEntriesByDest(entries, ".agents/skills")
+		if len(got) != 2 {
+			t.Fatalf("expected 2 entries, got %d: %v", len(got), got)
+		}
+		if _, ok := got["alpha"]; !ok {
+			t.Error("expected alpha (explicit default dest)")
+		}
+		if _, ok := got["gamma"]; !ok {
+			t.Error("expected gamma (empty dest → default)")
+		}
+	})
+
+	t.Run("matches entries with custom dest", func(t *testing.T) {
+		t.Parallel()
+		got := lock.FilterEntriesByDest(entries, "custom/path")
+		if len(got) != 1 {
+			t.Fatalf("expected 1 entry, got %d: %v", len(got), got)
+		}
+		if _, ok := got["beta"]; !ok {
+			t.Error("expected beta")
+		}
+	})
+
+	t.Run("does not match empty-dest entries against custom dest", func(t *testing.T) {
+		t.Parallel()
+		got := lock.FilterEntriesByDest(entries, "other/path")
+		if len(got) != 0 {
+			t.Fatalf("expected 0 entries, got %d: %v", len(got), got)
+		}
+	})
+
+	t.Run("preserves original entry without mutating dest", func(t *testing.T) {
+		t.Parallel()
+		got := lock.FilterEntriesByDest(entries, ".agents/skills")
+		if gamma, ok := got["gamma"]; ok && gamma.Dest != "" {
+			t.Errorf("gamma.Dest should remain empty, got %q", gamma.Dest)
+		}
+	})
+}
