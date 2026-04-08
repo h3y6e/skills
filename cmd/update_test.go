@@ -350,8 +350,8 @@ func TestUpdateApply(t *testing.T) {
 		lf := lock.File{
 			Version: 1,
 			Skills: map[string]lock.Entry{
-				"alpha": {Source: bareURL, SourceType: "git", ComputedHash: "stale-hash-alpha"},
-				"beta":  {Source: bareURL, SourceType: "git", ComputedHash: "stale-hash-beta"},
+				"alpha": {Source: bareURL, SourceType: "git", ComputedHash: "stale-hash-alpha", Dest: destDir},
+				"beta":  {Source: bareURL, SourceType: "git", ComputedHash: "stale-hash-beta", Dest: destDir},
 			},
 		}
 		lockPath := lock.FilePath(destDir)
@@ -406,7 +406,7 @@ func TestUpdateApply(t *testing.T) {
 		lf := lock.File{
 			Version: 1,
 			Skills: map[string]lock.Entry{
-				"alpha": {Source: bareURL, SourceType: "git", ComputedHash: "stale-hash"},
+				"alpha": {Source: bareURL, SourceType: "git", ComputedHash: "stale-hash", Dest: destDir},
 			},
 		}
 		lockPath := lock.FilePath(destDir)
@@ -458,8 +458,8 @@ func TestUpdateApply(t *testing.T) {
 		lf := lock.File{
 			Version: 1,
 			Skills: map[string]lock.Entry{
-				"alpha": {Source: bareURL, SourceType: "git", ComputedHash: "stale-alpha"},
-				"beta":  {Source: bareURL, SourceType: "git", ComputedHash: "stale-beta"},
+				"alpha": {Source: bareURL, SourceType: "git", ComputedHash: "stale-alpha", Dest: destDir},
+				"beta":  {Source: bareURL, SourceType: "git", ComputedHash: "stale-beta", Dest: destDir},
 			},
 		}
 		lockPath := lock.FilePath(destDir)
@@ -579,8 +579,8 @@ func TestUpdateIntegration(t *testing.T) {
 		lf := lock.File{
 			Version: 1,
 			Skills: map[string]lock.Entry{
-				"alpha": {Source: bareURL, SourceType: "git", ComputedHash: "some-hash"},
-				"beta":  {Source: bareURL, SourceType: "git", ComputedHash: "some-hash"},
+				"alpha": {Source: bareURL, SourceType: "git", ComputedHash: "some-hash", Dest: destDir},
+				"beta":  {Source: bareURL, SourceType: "git", ComputedHash: "some-hash", Dest: destDir},
 			},
 		}
 		lockPath := lock.FilePath(destDir)
@@ -627,8 +627,8 @@ func TestUpdateIntegration(t *testing.T) {
 		lf := lock.File{
 			Version: 1,
 			Skills: map[string]lock.Entry{
-				"alpha": {Source: bareURL, SourceType: "git", ComputedHash: "stale-a"},
-				"beta":  {Source: bareURL, SourceType: "git", ComputedHash: "stale-b"},
+				"alpha": {Source: bareURL, SourceType: "git", ComputedHash: "stale-a", Dest: destDir},
+				"beta":  {Source: bareURL, SourceType: "git", ComputedHash: "stale-b", Dest: destDir},
 			},
 		}
 		lockPath := lock.FilePath(destDir)

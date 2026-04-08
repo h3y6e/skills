@@ -48,7 +48,6 @@ func InstallSkills(skills []DiscoveredSkill, ref SourceRef, layout lock.Layout) 
 	if err != nil {
 		return err
 	}
-	lf.Skills = lock.NormalizeEntries(lf.Skills, layout.DestDir)
 
 	if err := tx.Apply(); err != nil {
 		return err
