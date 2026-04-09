@@ -24,6 +24,17 @@ func TestParseSource(t *testing.T) {
 			},
 		},
 		{
+			name: "github shorthand with ref",
+			raw:  "h3y6e/spec-skills#feature/install",
+			want: skill.SourceRef{
+				Raw:             "h3y6e/spec-skills#feature/install",
+				SourceType:      "github",
+				CanonicalSource: "h3y6e/spec-skills",
+				CloneURL:        "https://github.com/h3y6e/spec-skills.git",
+				Ref:             "feature/install",
+			},
+		},
+		{
 			name: "github https url",
 			raw:  "https://github.com/h3y6e/spec-skills",
 			want: skill.SourceRef{
@@ -31,6 +42,17 @@ func TestParseSource(t *testing.T) {
 				SourceType:      "github",
 				CanonicalSource: "h3y6e/spec-skills",
 				CloneURL:        "https://github.com/h3y6e/spec-skills.git",
+			},
+		},
+		{
+			name: "github https url with ref",
+			raw:  "https://github.com/h3y6e/spec-skills.git#release-2026",
+			want: skill.SourceRef{
+				Raw:             "https://github.com/h3y6e/spec-skills.git#release-2026",
+				SourceType:      "github",
+				CanonicalSource: "h3y6e/spec-skills",
+				CloneURL:        "https://github.com/h3y6e/spec-skills.git",
+				Ref:             "release-2026",
 			},
 		},
 		{
@@ -44,6 +66,17 @@ func TestParseSource(t *testing.T) {
 			},
 		},
 		{
+			name: "gitlab https url with ref",
+			raw:  "https://gitlab.com/h3y6e/repo#feature/install",
+			want: skill.SourceRef{
+				Raw:             "https://gitlab.com/h3y6e/repo#feature/install",
+				SourceType:      "gitlab",
+				CanonicalSource: "h3y6e/repo",
+				CloneURL:        "https://gitlab.com/h3y6e/repo.git",
+				Ref:             "feature/install",
+			},
+		},
+		{
 			name: "github ssh url",
 			raw:  "git@github.com:h3y6e/spec-skills.git",
 			want: skill.SourceRef{
@@ -54,6 +87,17 @@ func TestParseSource(t *testing.T) {
 			},
 		},
 		{
+			name: "github ssh url with ref",
+			raw:  "git@github.com:h3y6e/spec-skills.git#feature/install",
+			want: skill.SourceRef{
+				Raw:             "git@github.com:h3y6e/spec-skills.git#feature/install",
+				SourceType:      "github",
+				CanonicalSource: "h3y6e/spec-skills",
+				CloneURL:        "git@github.com:h3y6e/spec-skills.git",
+				Ref:             "feature/install",
+			},
+		},
+		{
 			name: "generic git url",
 			raw:  "ssh://git@example.com/team/skills.git",
 			want: skill.SourceRef{
@@ -61,6 +105,17 @@ func TestParseSource(t *testing.T) {
 				SourceType:      "git",
 				CanonicalSource: "ssh://git@example.com/team/skills.git",
 				CloneURL:        "ssh://git@example.com/team/skills.git",
+			},
+		},
+		{
+			name: "generic git url with ref",
+			raw:  "ssh://git@example.com/team/skills.git#release-2026",
+			want: skill.SourceRef{
+				Raw:             "ssh://git@example.com/team/skills.git#release-2026",
+				SourceType:      "git",
+				CanonicalSource: "ssh://git@example.com/team/skills.git",
+				CloneURL:        "ssh://git@example.com/team/skills.git",
+				Ref:             "release-2026",
 			},
 		},
 		{
@@ -79,6 +134,11 @@ func TestParseSource(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "github blob url is unsupported",
+			raw:     "https://github.com/h3y6e/spec-skills/blob/main/README.md#L10",
+			wantErr: true,
+		},
+		{
 			name: "file url for local testing",
 			raw:  "file:///tmp/bare-repo",
 			want: skill.SourceRef{
@@ -86,6 +146,17 @@ func TestParseSource(t *testing.T) {
 				SourceType:      "git",
 				CanonicalSource: "file:///tmp/bare-repo",
 				CloneURL:        "file:///tmp/bare-repo",
+			},
+		},
+		{
+			name: "file url with ref",
+			raw:  "file:///tmp/bare-repo#topic",
+			want: skill.SourceRef{
+				Raw:             "file:///tmp/bare-repo#topic",
+				SourceType:      "git",
+				CanonicalSource: "file:///tmp/bare-repo",
+				CloneURL:        "file:///tmp/bare-repo",
+				Ref:             "topic",
 			},
 		},
 	}

@@ -342,3 +342,44 @@ func TestCheckNonMutating(t *testing.T) {
 		t.Error("skill files should not be modified by check")
 	}
 }
+
+func TestCheckJSONIncludesRef(t *testing.T) {
+	t.Parallel()
+
+	bareURLWithRefs := initBareRepoWithRefs(t)
+	destDir := filepath.Join(t.TempDir(), ".agents", "skills")
+	lf := lock.File{
+		Version: 1,
+		Skills: map[string]lock.Entry{
+			"alpha": {
+				Source:       bareURLWithRefs,
+				Ref:          "feature/install",
+				SourceType:   "git",
+				ComputedHash: "stale-hash",
+				Dest:         destDir,
+			},
+		},
+	}
+	if err := lock.WriteFile(lock.FilePath(destDir), lf); err != nil {
+		t.Fatalf("write lockfile: %v", err)
+	}
+
+	var out bytes.Buffer
+	root := cmd.NewRootCmd("test")
+	root.SetOut(&out)
+	root.SetArgs([]string{"check", "--json", "-d", destDir})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("check --json error: %v", err)
+	}
+
+	var results []map[string]any
+	if err := json.Unmarshal(out.Bytes(), &results); err != nil {
+		t.Fatalf("invalid JSON: %v\nraw: %s", err, out.String())
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0]["ref"] != "feature/install" {
+		t.Errorf("ref = %v, want %q", results[0]["ref"], "feature/install")
+	}
+}

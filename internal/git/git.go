@@ -14,8 +14,28 @@ func gitCommand(ctx context.Context, args ...string) (*exec.Cmd, error) {
 	return exec.CommandContext(ctx, gitPath, args...), nil
 }
 
-// ShallowClone clones cloneURL into destDir with depth=1.
-func ShallowClone(ctx context.Context, cloneURL, destDir string) error {
+func runGit(ctx context.Context, args ...string) ([]byte, error) {
+	cmd, err := gitCommand(ctx, args...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return out, fmt.Errorf("git %v: %w\n%s", args, err, out)
+	}
+	return out, nil
+}
+
+// ShallowClone clones cloneURL into destDir with depth=1 and optionally checks
+// out the requested ref.
+func ShallowClone(ctx context.Context, cloneURL, ref, destDir string) error {
+	if ref == "" {
+		return shallowCloneDefault(ctx, cloneURL, destDir)
+	}
+	return shallowCloneRef(ctx, cloneURL, ref, destDir)
+}
+
+func shallowCloneDefault(ctx context.Context, cloneURL, destDir string) error {
 	cmd, err := gitCommand(ctx, "clone", "--depth", "1", cloneURL, destDir)
 	if err != nil {
 		return err
@@ -23,6 +43,22 @@ func ShallowClone(ctx context.Context, cloneURL, destDir string) error {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git clone %q: %w\n%s", cloneURL, err, out)
+	}
+	return nil
+}
+
+func shallowCloneRef(ctx context.Context, cloneURL, ref, destDir string) error {
+	if _, err := runGit(ctx, "init", destDir); err != nil {
+		return err
+	}
+	if _, err := runGit(ctx, "-C", destDir, "remote", "add", "origin", cloneURL); err != nil {
+		return err
+	}
+	if _, err := runGit(ctx, "-C", destDir, "fetch", "--depth", "1", "origin", ref); err != nil {
+		return err
+	}
+	if _, err := runGit(ctx, "-C", destDir, "checkout", "--detach", "FETCH_HEAD"); err != nil {
+		return err
 	}
 	return nil
 }

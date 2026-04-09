@@ -56,6 +56,7 @@ func InstallSkills(skills []DiscoveredSkill, ref SourceRef, layout lock.Layout) 
 	for _, s := range skills {
 		lf.Skills[s.Name] = lock.Entry{
 			Source:       ref.CanonicalSource,
+			Ref:          ref.Ref,
 			SourceType:   ref.SourceType,
 			ComputedHash: s.ComputedHash,
 			Dest:         filepath.Clean(layout.DestDir),

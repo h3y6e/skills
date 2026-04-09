@@ -305,6 +305,76 @@ func TestAggregateUpdateCandidates(t *testing.T) {
 		}
 	})
 
+	t.Run("groups entries by source and ref", func(t *testing.T) {
+		t.Parallel()
+
+		srcMain := t.TempDir()
+		srcFeature := t.TempDir()
+
+		writeFiles(t, srcMain, map[string]string{
+			"skills/shared-main/SKILL.md": "# Main\n",
+		})
+		writeFiles(t, srcFeature, map[string]string{
+			"skills/shared-feature/SKILL.md": "# Feature\n",
+		})
+
+		discoveredMain, _ := skill.DiscoverSkills(srcMain)
+		discoveredFeature, _ := skill.DiscoverSkills(srcFeature)
+
+		entries := map[string]lock.Entry{
+			"shared-main": {
+				Source:       "h3y6e/spec-skills",
+				Ref:          "main",
+				SourceType:   "github",
+				ComputedHash: "stale-main",
+			},
+			"shared-feature": {
+				Source:       "h3y6e/spec-skills",
+				Ref:          "feature/install",
+				SourceType:   "github",
+				ComputedHash: "stale-feature",
+			},
+		}
+
+		cloneDirs := map[string]string{
+			"h3y6e/spec-skills#main":            srcMain,
+			"h3y6e/spec-skills#feature/install": srcFeature,
+		}
+		cloneFn := func(source string) (string, error) {
+			dir, ok := cloneDirs[source]
+			if !ok {
+				t.Fatalf("unexpected clone for source %q", source)
+			}
+			return dir, nil
+		}
+
+		candidates, _, err := skill.AggregateUpdateCandidates(entries, cloneFn)
+		if err != nil {
+			t.Fatalf("AggregateUpdateCandidates() error = %v", err)
+		}
+		if len(candidates) != 2 {
+			t.Fatalf("expected 2 candidates, got %d", len(candidates))
+		}
+
+		byName := map[string]skill.UpdateCandidate{}
+		for _, candidate := range candidates {
+			byName[candidate.SkillName] = candidate
+		}
+
+		if byName["shared-main"].Ref != "main" {
+			t.Errorf("shared-main Ref = %q, want %q", byName["shared-main"].Ref, "main")
+		}
+		if byName["shared-main"].LatestHash != discoveredMain[0].ComputedHash {
+			t.Errorf("shared-main LatestHash = %q, want %q", byName["shared-main"].LatestHash, discoveredMain[0].ComputedHash)
+		}
+		if byName["shared-feature"].Ref != "feature/install" {
+			t.Errorf("shared-feature Ref = %q, want %q", byName["shared-feature"].Ref, "feature/install")
+		}
+		if byName["shared-feature"].LatestHash != discoveredFeature[0].ComputedHash {
+			t.Errorf("shared-feature LatestHash = %q, want %q", byName["shared-feature"].LatestHash, discoveredFeature[0].ComputedHash)
+		}
+	})
+
 	t.Run("returns sorted candidates across sources", func(t *testing.T) {
 		t.Parallel()
 

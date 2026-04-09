@@ -7,12 +7,14 @@ import (
 	"slices"
 
 	"github.com/h3y6e/skills/internal/lock"
+	"github.com/h3y6e/skills/internal/skill"
 	"github.com/spf13/cobra"
 )
 
 type listEntryJSON struct {
 	SkillName    string `json:"skillName"`
 	Source       string `json:"source"`
+	Ref          string `json:"ref,omitempty"`
 	SourceType   string `json:"sourceType"`
 	ComputedHash string `json:"computedHash"`
 }
@@ -34,6 +36,7 @@ func runList(cmd *cobra.Command, destDir string, jsonFlag bool) error {
 			payload = append(payload, listEntryJSON{
 				SkillName:    name,
 				Source:       entry.Source,
+				Ref:          entry.Ref,
 				SourceType:   entry.SourceType,
 				ComputedHash: entry.ComputedHash,
 			})
@@ -53,7 +56,7 @@ func runList(cmd *cobra.Command, destDir string, jsonFlag bool) error {
 
 	for _, name := range names {
 		entry := entries[name]
-		fmt.Fprintf(cmd.OutOrStdout(), "%s  %s  %s\n", name, entry.Source, ShortHash(entry.ComputedHash))
+		fmt.Fprintf(cmd.OutOrStdout(), "%s  %s  %s\n", name, skill.FormatSourceInput(entry.Source, entry.Ref), ShortHash(entry.ComputedHash))
 	}
 	return nil
 }

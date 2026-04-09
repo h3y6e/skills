@@ -74,6 +74,48 @@ func initBareRepo(t *testing.T, files map[string]string) string {
 	return "file://" + bare
 }
 
+func initBareRepoWithRefs(t *testing.T) string {
+	t.Helper()
+
+	work := t.TempDir()
+
+	gitInDir(t, work, "init", "-b", "main")
+	gitInDir(t, work, "config", "user.email", "test@test.com")
+	gitInDir(t, work, "config", "user.name", "Test")
+
+	base := filepath.Join(work, "skills", "my-skill", "SKILL.md")
+	if err := os.MkdirAll(filepath.Dir(base), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(base, []byte("# Main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitInDir(t, work, "add", "-A")
+	gitInDir(t, work, "commit", "-m", "main")
+	gitInDir(t, work, "tag", "v1.0.0")
+
+	gitInDir(t, work, "checkout", "-b", "feature/install")
+	if err := os.WriteFile(base, []byte("# Feature\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitInDir(t, work, "add", "-A")
+	gitInDir(t, work, "commit", "-m", "feature")
+	gitInDir(t, work, "checkout", "main")
+
+	bare := t.TempDir()
+	cmd := exec.Command("git", "clone", "--bare", work, bare)
+	cmd.Env = append(os.Environ(),
+		"GIT_CONFIG_GLOBAL=/dev/null",
+		"GIT_CONFIG_SYSTEM=/dev/null",
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git clone --bare failed: %v\n%s", err, out)
+	}
+
+	return "file://" + bare
+}
+
 func TestShallowClone(t *testing.T) {
 	t.Parallel()
 
@@ -86,7 +128,7 @@ func TestShallowClone(t *testing.T) {
 		t.Parallel()
 		dest := filepath.Join(t.TempDir(), "clone-dest")
 
-		err := git.ShallowClone(context.Background(), bareRepo, dest)
+		err := git.ShallowClone(context.Background(), bareRepo, "", dest)
 		if err != nil {
 			t.Fatalf("ShallowClone() error = %v", err)
 		}
@@ -105,7 +147,7 @@ func TestShallowClone(t *testing.T) {
 		t.Parallel()
 		dest := filepath.Join(t.TempDir(), "shallow-check")
 
-		if err := git.ShallowClone(context.Background(), bareRepo, dest); err != nil {
+		if err := git.ShallowClone(context.Background(), bareRepo, "", dest); err != nil {
 			t.Fatalf("ShallowClone() error = %v", err)
 		}
 
@@ -120,7 +162,7 @@ func TestShallowClone(t *testing.T) {
 		t.Parallel()
 		dest := filepath.Join(t.TempDir(), "bad-clone")
 
-		err := git.ShallowClone(context.Background(), "/nonexistent/repo", dest)
+		err := git.ShallowClone(context.Background(), "/nonexistent/repo", "", dest)
 		if err == nil {
 			t.Fatal("expected error for invalid clone URL, got nil")
 		}
@@ -133,9 +175,51 @@ func TestShallowClone(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		err := git.ShallowClone(ctx, bareRepo, dest)
+		err := git.ShallowClone(ctx, bareRepo, "", dest)
 		if err == nil {
 			t.Fatal("expected error for cancelled context, got nil")
+		}
+	})
+
+	t.Run("clones requested branch ref", func(t *testing.T) {
+		t.Parallel()
+
+		bareWithRefs := initBareRepoWithRefs(t)
+		dest := filepath.Join(t.TempDir(), "branch-clone")
+
+		if err := git.ShallowClone(context.Background(), bareWithRefs, "feature/install", dest); err != nil {
+			t.Fatalf("ShallowClone() error = %v", err)
+		}
+
+		data, err := os.ReadFile(filepath.Join(dest, "skills", "my-skill", "SKILL.md"))
+		if err != nil {
+			t.Fatalf("expected cloned branch file: %v", err)
+		}
+		if string(data) != "# Feature\n" {
+			t.Errorf("branch clone content = %q, want %q", string(data), "# Feature\n")
+		}
+		out := gitInDir(t, dest, "rev-list", "--count", "HEAD")
+		if strings.TrimSpace(out) != "1" {
+			t.Errorf("expected shallow branch clone, got %s commits", strings.TrimSpace(out))
+		}
+	})
+
+	t.Run("clones requested tag ref", func(t *testing.T) {
+		t.Parallel()
+
+		bareWithRefs := initBareRepoWithRefs(t)
+		dest := filepath.Join(t.TempDir(), "tag-clone")
+
+		if err := git.ShallowClone(context.Background(), bareWithRefs, "v1.0.0", dest); err != nil {
+			t.Fatalf("ShallowClone() error = %v", err)
+		}
+
+		data, err := os.ReadFile(filepath.Join(dest, "skills", "my-skill", "SKILL.md"))
+		if err != nil {
+			t.Fatalf("expected cloned tag file: %v", err)
+		}
+		if string(data) != "# Main\n" {
+			t.Errorf("tag clone content = %q, want %q", string(data), "# Main\n")
 		}
 	})
 }

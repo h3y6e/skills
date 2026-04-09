@@ -67,6 +67,117 @@ func initBareRepo(t *testing.T, files map[string]string) string {
 	return "file://" + bare
 }
 
+func initBareRepoWithRefs(t *testing.T) string {
+	t.Helper()
+
+	work := t.TempDir()
+	gitRun := func(args ...string) {
+		t.Helper()
+		c := exec.Command("git", args...)
+		c.Dir = work
+		c.Env = append(os.Environ(),
+			"GIT_CONFIG_GLOBAL=/dev/null",
+			"GIT_CONFIG_SYSTEM=/dev/null",
+		)
+		out, err := c.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+
+	gitRun("init", "-b", "main")
+	gitRun("config", "user.email", "test@test.com")
+	gitRun("config", "user.name", "Test")
+
+	skillPath := filepath.Join(work, "skills", "alpha", "SKILL.md")
+	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(skillPath, []byte("# Alpha main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun("add", "-A")
+	gitRun("commit", "-m", "main")
+	gitRun("tag", "v1.0.0")
+
+	gitRun("checkout", "-b", "feature/install")
+	if err := os.WriteFile(skillPath, []byte("# Alpha feature\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun("add", "-A")
+	gitRun("commit", "-m", "feature")
+	gitRun("checkout", "main")
+
+	bare := t.TempDir()
+	c := exec.Command("git", "clone", "--bare", work, bare)
+	c.Env = append(os.Environ(),
+		"GIT_CONFIG_GLOBAL=/dev/null",
+		"GIT_CONFIG_SYSTEM=/dev/null",
+	)
+	out, err := c.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git clone --bare: %v\n%s", err, out)
+	}
+	return "file://" + bare
+}
+
+func initBareRepoWithSplitRefSkills(t *testing.T) string {
+	t.Helper()
+
+	work := t.TempDir()
+	gitRun := func(args ...string) {
+		t.Helper()
+		c := exec.Command("git", args...)
+		c.Dir = work
+		c.Env = append(os.Environ(),
+			"GIT_CONFIG_GLOBAL=/dev/null",
+			"GIT_CONFIG_SYSTEM=/dev/null",
+		)
+		out, err := c.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+
+	gitRun("init", "-b", "main")
+	gitRun("config", "user.email", "test@test.com")
+	gitRun("config", "user.name", "Test")
+
+	alphaPath := filepath.Join(work, "skills", "alpha", "SKILL.md")
+	if err := os.MkdirAll(filepath.Dir(alphaPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(alphaPath, []byte("# Alpha main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun("add", "-A")
+	gitRun("commit", "-m", "main")
+
+	gitRun("checkout", "-b", "feature/install")
+	betaPath := filepath.Join(work, "skills", "beta", "SKILL.md")
+	if err := os.MkdirAll(filepath.Dir(betaPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(betaPath, []byte("# Beta feature\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun("add", "-A")
+	gitRun("commit", "-m", "feature")
+	gitRun("checkout", "main")
+
+	bare := t.TempDir()
+	c := exec.Command("git", "clone", "--bare", work, bare)
+	c.Env = append(os.Environ(),
+		"GIT_CONFIG_GLOBAL=/dev/null",
+		"GIT_CONFIG_SYSTEM=/dev/null",
+	)
+	out, err := c.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git clone --bare: %v\n%s", err, out)
+	}
+	return "file://" + bare
+}
+
 func TestAddList(t *testing.T) {
 	t.Parallel()
 
@@ -219,6 +330,35 @@ func TestAddInstall(t *testing.T) {
 		}
 		if !strings.Contains(lockStr, `"beta"`) {
 			t.Error("lockfile should contain beta")
+		}
+	})
+
+	t.Run("persists ref when source uses ref fragment", func(t *testing.T) {
+		t.Parallel()
+
+		bareURLWithRefs := initBareRepoWithRefs(t)
+		destDir := filepath.Join(t.TempDir(), ".agents", "skills")
+
+		root := cmd.NewRootCmd("test")
+		root.SetArgs([]string{"add", "-d", destDir, bareURLWithRefs + "#feature/install"})
+		if err := root.Execute(); err != nil {
+			t.Fatalf("execute error: %v", err)
+		}
+
+		data, err := os.ReadFile(filepath.Join(destDir, "alpha", "SKILL.md"))
+		if err != nil {
+			t.Fatalf("expected alpha/SKILL.md: %v", err)
+		}
+		if string(data) != "# Alpha feature\n" {
+			t.Errorf("content = %q, want %q", string(data), "# Alpha feature\n")
+		}
+
+		lf, err := lock.ReadFile(lock.FilePath(destDir))
+		if err != nil {
+			t.Fatalf("read lockfile: %v", err)
+		}
+		if lf.Skills["alpha"].Ref != "feature/install" {
+			t.Errorf("alpha.Ref = %q, want %q", lf.Skills["alpha"].Ref, "feature/install")
 		}
 	})
 

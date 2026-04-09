@@ -50,6 +50,7 @@ type CheckResult struct {
 	SkillName   string       `json:"skillName"`
 	Status      skill.Status `json:"status"`
 	Source      string       `json:"source"`
+	Ref         string       `json:"ref,omitempty"`
 	CurrentHash string       `json:"currentHash"`
 	LatestHash  string       `json:"latestHash,omitempty"`
 	Reason      string       `json:"reason,omitempty"`
@@ -60,6 +61,7 @@ func NewCheckResult(candidate skill.UpdateCandidate) CheckResult {
 		SkillName:   candidate.SkillName,
 		Status:      candidate.Status,
 		Source:      candidate.Source,
+		Ref:         candidate.Ref,
 		CurrentHash: candidate.CurrentHash,
 		LatestHash:  candidate.LatestHash,
 		Reason:      candidate.Reason,

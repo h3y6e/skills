@@ -24,7 +24,7 @@ func runAdd(cmd *cobra.Command, source string, listMode bool, skillFilter []stri
 	}
 	defer os.RemoveAll(tmpDir)
 
-	if err := git.ShallowClone(cmd.Context(), ref.CloneURL, tmpDir); err != nil {
+	if err := git.ShallowClone(cmd.Context(), ref.CloneURL, ref.Ref, tmpDir); err != nil {
 		return fmt.Errorf("clone %s: %w", ref.CanonicalSource, err)
 	}
 

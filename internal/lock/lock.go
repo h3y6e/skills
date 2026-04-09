@@ -21,6 +21,7 @@ type File struct {
 // Entry represents a single skill in the lockfile.
 type Entry struct {
 	Source       string `json:"source"`
+	Ref          string `json:"ref,omitempty"`
 	SourceType   string `json:"sourceType"`
 	ComputedHash string `json:"computedHash"`
 	Dest         string `json:"dest,omitempty"`

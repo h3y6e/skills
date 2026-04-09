@@ -247,3 +247,43 @@ func TestListJSONEmpty(t *testing.T) {
 		t.Errorf("expected empty array, got %d items", len(results))
 	}
 }
+
+func TestListJSONIncludesRef(t *testing.T) {
+	t.Parallel()
+
+	destDir := filepath.Join(t.TempDir(), ".agents", "skills")
+	lf := lock.File{
+		Version: 1,
+		Skills: map[string]lock.Entry{
+			"alpha": {
+				Source:       "h3y6e/spec-skills",
+				Ref:          "feature/install",
+				SourceType:   "github",
+				ComputedHash: "abc123",
+				Dest:         destDir,
+			},
+		},
+	}
+	if err := lock.WriteFile(lock.FilePath(destDir), lf); err != nil {
+		t.Fatalf("write lockfile: %v", err)
+	}
+
+	var out bytes.Buffer
+	root := cmd.NewRootCmd("test")
+	root.SetOut(&out)
+	root.SetArgs([]string{"list", "--json", "-d", destDir})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("list --json error: %v", err)
+	}
+
+	var results []map[string]any
+	if err := json.Unmarshal(out.Bytes(), &results); err != nil {
+		t.Fatalf("invalid JSON: %v\nraw: %s", err, out.String())
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0]["ref"] != "feature/install" {
+		t.Errorf("ref = %v, want %q", results[0]["ref"], "feature/install")
+	}
+}
