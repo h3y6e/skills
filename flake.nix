@@ -37,6 +37,7 @@
 
           devShells.default = pkgs.mkShell {
             packages = [
+              pkgs.git
               pkgs.go_1_26
               pkgs.go-tools
             ];
