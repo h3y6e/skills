@@ -118,9 +118,7 @@ func filterEntriesBySource(entries map[string]lock.Entry, source string) (map[st
 		if ref.Ref != "" && entry.Ref != ref.Ref {
 			continue
 		}
-		if ref.Ref == "" || entry.Ref == ref.Ref {
-			filtered[name] = entry
-		}
+		filtered[name] = entry
 	}
 
 	return filtered, nil
