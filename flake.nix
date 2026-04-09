@@ -1,0 +1,45 @@
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+    treefmt-nix.url = "github:numtide/treefmt-nix";
+  };
+
+  outputs =
+    inputs@{
+      flake-parts,
+      treefmt-nix,
+      ...
+    }:
+    flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = [ treefmt-nix.flakeModule ];
+
+      systems = [
+        "aarch64-darwin"
+        "aarch64-linux"
+        "x86_64-darwin"
+        "x86_64-linux"
+      ];
+
+      perSystem =
+        {
+          config,
+          pkgs,
+          ...
+        }:
+        {
+          treefmt = {
+            projectRootFile = "flake.nix";
+            programs.gofmt.enable = true;
+            programs.nixfmt.enable = true;
+          };
+
+          devShells.default = pkgs.mkShell {
+            packages = [
+              pkgs.go_1_26
+              pkgs.go-tools
+            ];
+          };
+        };
+    };
+}

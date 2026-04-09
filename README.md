@@ -48,16 +48,6 @@ skills-lock.json
 
 See [h3y6e/dotfiles](https://github.com/h3y6e/dotfiles/blob/main/.github/workflows/skills.yaml) for a working example.
 
-## Development
-
-Requires [mise](https://mise.jdx.dev/).
-
-```sh
-mise run check   # gofmt + go vet + staticcheck
-mise run test    # Run tests
-mise run build   # Build binary
-```
-
 ## License
 
 [MIT](LICENSE)
