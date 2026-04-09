@@ -20,6 +20,7 @@ Or download a binary from [Releases](https://github.com/h3y6e/skills/releases).
 
 ```sh
 skills add h3y6e/spec-skills                               # Install skills from a repository
+skills add h3y6e/spec-skills#main                          # Install from an explicit ref
 skills add --list h3y6e/spec-skills                        # Preview available skills
 skills add -s spec-plan h3y6e/spec-skills                  # Install specific skills only
 skills add -d dot_agents/exact_skills h3y6e/spec-skills    # Custom destination (e.g. chezmoi)
@@ -27,6 +28,7 @@ skills add -d dot_agents/exact_skills h3y6e/spec-skills    # Custom destination 
 skills list                                                # Show installed skills
 skills check                                               # Check for upstream updates
 skills update                                              # Review diffs and apply updates
+skills update h3y6e/spec-skills#main                      # Update only entries installed from that ref
 skills update -y                                           # Apply without confirmation (CI-safe)
 skills remove spec-plan                                    # Remove a skill
 ```

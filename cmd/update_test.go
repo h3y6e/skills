@@ -275,9 +275,7 @@ func TestUpdateSkillFilter(t *testing.T) {
 		root3.SetOut(&out)
 		root3.SetArgs([]string{"update", "-y", "-d", destDir, bareURL2})
 		if err := root3.Execute(); err != nil {
-			// file:// URLs get parsed as canonicalSource — may need adjustment.
-			// For now, just verify the command doesn't panic.
-			_ = err
+			t.Fatalf("update error: %v", err)
 		}
 
 		got := out.String()
@@ -287,6 +285,93 @@ func TestUpdateSkillFilter(t *testing.T) {
 		}
 		if strings.Contains(got, "beta") {
 			t.Errorf("output should not mention beta when source is second repo, got: %q", got)
+		}
+	})
+
+	t.Run("source argument with ref filters to matching ref only", func(t *testing.T) {
+		t.Parallel()
+
+		bareURLWithRefs := initBareRepoWithSplitRefSkills(t)
+		destDir := filepath.Join(t.TempDir(), ".agents", "skills")
+
+		if err := os.MkdirAll(filepath.Join(destDir, "alpha"), 0o755); err != nil {
+			t.Fatalf("mkdir alpha: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(destDir, "alpha", "SKILL.md"), []byte("# Alpha old\n"), 0o644); err != nil {
+			t.Fatalf("write alpha: %v", err)
+		}
+		if err := os.MkdirAll(filepath.Join(destDir, "beta"), 0o755); err != nil {
+			t.Fatalf("mkdir beta: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(destDir, "beta", "SKILL.md"), []byte("# Beta old\n"), 0o644); err != nil {
+			t.Fatalf("write beta: %v", err)
+		}
+
+		lockPath := lock.FilePath(destDir)
+		lf := lock.File{
+			Version: 1,
+			Skills: map[string]lock.Entry{
+				"alpha": {
+					Source:       bareURLWithRefs,
+					SourceType:   "git",
+					Ref:          "main",
+					ComputedHash: "stale-alpha",
+					Dest:         destDir,
+				},
+				"beta": {
+					Source:       bareURLWithRefs,
+					SourceType:   "git",
+					Ref:          "feature/install",
+					ComputedHash: "stale-beta",
+					Dest:         destDir,
+				},
+			},
+		}
+		if err := lock.WriteFile(lockPath, lf); err != nil {
+			t.Fatalf("write lockfile: %v", err)
+		}
+
+		var out bytes.Buffer
+		root := cmd.NewRootCmd("test")
+		root.SetOut(&out)
+		root.SetArgs([]string{"update", "-y", "-d", destDir, bareURLWithRefs + "#feature/install"})
+		if err := root.Execute(); err != nil {
+			t.Fatalf("update error: %v", err)
+		}
+
+		got := out.String()
+		if strings.Contains(got, "alpha") {
+			t.Errorf("output should not mention alpha when ref is feature/install, got: %q", got)
+		}
+		if !strings.Contains(got, "beta: updated") {
+			t.Errorf("expected beta to be updated, got: %q", got)
+		}
+
+		alphaData, err := os.ReadFile(filepath.Join(destDir, "alpha", "SKILL.md"))
+		if err != nil {
+			t.Fatalf("read alpha: %v", err)
+		}
+		if string(alphaData) != "# Alpha old\n" {
+			t.Errorf("alpha = %q, want %q", string(alphaData), "# Alpha old\n")
+		}
+
+		betaData, err := os.ReadFile(filepath.Join(destDir, "beta", "SKILL.md"))
+		if err != nil {
+			t.Fatalf("read beta: %v", err)
+		}
+		if string(betaData) != "# Beta feature\n" {
+			t.Errorf("beta = %q, want %q", string(betaData), "# Beta feature\n")
+		}
+
+		updatedLF, err := lock.ReadFile(lockPath)
+		if err != nil {
+			t.Fatalf("read updated lockfile: %v", err)
+		}
+		if updatedLF.Skills["alpha"].ComputedHash != "stale-alpha" {
+			t.Errorf("alpha hash = %q, want %q", updatedLF.Skills["alpha"].ComputedHash, "stale-alpha")
+		}
+		if updatedLF.Skills["beta"].ComputedHash == "stale-beta" {
+			t.Error("beta hash should be refreshed")
 		}
 	})
 }

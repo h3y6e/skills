@@ -34,6 +34,7 @@ type DiscoveredSkill struct {
 type UpdateCandidate struct {
 	SkillName   string
 	Source      string
+	Ref         string
 	CurrentHash string
 	LatestHash  string
 	Status      Status
@@ -65,6 +66,7 @@ func ResolveUpdateCandidates(entries map[string]lock.Entry, upstream []Discovere
 			candidates = append(candidates, UpdateCandidate{
 				SkillName:   name,
 				Source:      entry.Source,
+				Ref:         entry.Ref,
 				CurrentHash: entry.ComputedHash,
 				Status:      StatusCheckFailed,
 				Reason:      fmt.Sprintf("skill %q not found in upstream source", name),
@@ -80,6 +82,7 @@ func ResolveUpdateCandidates(entries map[string]lock.Entry, upstream []Discovere
 		candidates = append(candidates, UpdateCandidate{
 			SkillName:   name,
 			Source:      entry.Source,
+			Ref:         entry.Ref,
 			CurrentHash: entry.ComputedHash,
 			LatestHash:  up.ComputedHash,
 			Status:      status,
@@ -194,7 +197,7 @@ func NewCloneFunc(ctx context.Context, prefix string) (CloneFunc, func()) {
 		if err != nil {
 			return "", fmt.Errorf("create temp dir: %w", err)
 		}
-		if err := git.ShallowClone(ctx, ref.CloneURL, tmpDir); err != nil {
+		if err := git.ShallowClone(ctx, ref.CloneURL, ref.Ref, tmpDir); err != nil {
 			os.RemoveAll(tmpDir)
 			return "", err
 		}
@@ -250,10 +253,11 @@ func partitionSupportedEntries(entries map[string]lock.Entry) (map[string]lock.E
 func groupEntriesBySource(entries map[string]lock.Entry) map[string]map[string]lock.Entry {
 	bySource := make(map[string]map[string]lock.Entry)
 	for name, entry := range entries {
-		group, ok := bySource[entry.Source]
+		sourceKey := FormatSourceInput(entry.Source, entry.Ref)
+		group, ok := bySource[sourceKey]
 		if !ok {
 			group = make(map[string]lock.Entry)
-			bySource[entry.Source] = group
+			bySource[sourceKey] = group
 		}
 		group[name] = entry
 	}

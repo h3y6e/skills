@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -15,6 +16,7 @@ type SourceRef struct {
 	SourceType      string
 	CanonicalSource string
 	CloneURL        string
+	Ref             string
 }
 
 // ParseSource parses a source string into a SourceRef.
@@ -25,49 +27,68 @@ func ParseSource(raw string) (SourceRef, error) {
 		return SourceRef{}, fmt.Errorf("parse source: empty source")
 	}
 
-	if shorthandPattern.MatchString(raw) {
+	rawWithoutFragment, ref := splitSourceFragment(raw)
+
+	if shorthandPattern.MatchString(rawWithoutFragment) {
 		return SourceRef{
 			Raw:             raw,
 			SourceType:      "github",
-			CanonicalSource: raw,
-			CloneURL:        "https://github.com/" + raw + ".git",
+			CanonicalSource: rawWithoutFragment,
+			CloneURL:        "https://github.com/" + rawWithoutFragment + ".git",
+			Ref:             ref,
 		}, nil
 	}
 
-	if strings.HasPrefix(raw, "git@") {
-		return parseSCPSource(raw)
+	if strings.HasPrefix(rawWithoutFragment, "git@") {
+		return parseSCPSource(raw, rawWithoutFragment, ref)
 	}
 
-	u, err := url.Parse(raw)
+	u, err := url.Parse(rawWithoutFragment)
 	if err != nil {
-		return SourceRef{}, fmt.Errorf("parse source %q: %w", raw, err)
+		return SourceRef{}, fmt.Errorf("parse source %q: %w", rawWithoutFragment, err)
 	}
 
 	if u.Scheme == "http" || u.Scheme == "https" || u.Scheme == "ssh" {
-		return parseURLSource(raw, u)
+		return parseURLSource(raw, rawWithoutFragment, u, ref)
 	}
 
 	if u.Scheme == "file" {
 		return SourceRef{
 			Raw:             raw,
 			SourceType:      "git",
-			CanonicalSource: raw,
-			CloneURL:        raw,
+			CanonicalSource: rawWithoutFragment,
+			CloneURL:        rawWithoutFragment,
+			Ref:             ref,
 		}, nil
 	}
 
-	return SourceRef{}, fmt.Errorf("parse source %q: unsupported format", raw)
+	return SourceRef{}, fmt.Errorf("parse source %q: unsupported format", rawWithoutFragment)
 }
 
-func parseSCPSource(raw string) (SourceRef, error) {
-	rest, found := strings.CutPrefix(raw, "git@")
+func FormatSourceInput(source, ref string) string {
+	if ref == "" {
+		return source
+	}
+	return source + "#" + ref
+}
+
+func splitSourceFragment(raw string) (string, string) {
+	hashIndex := strings.LastIndex(raw, "#")
+	if hashIndex <= 0 || hashIndex == len(raw)-1 {
+		return raw, ""
+	}
+	return raw[:hashIndex], raw[hashIndex+1:]
+}
+
+func parseSCPSource(raw, rawWithoutFragment, ref string) (SourceRef, error) {
+	rest, found := strings.CutPrefix(rawWithoutFragment, "git@")
 	if !found {
-		return SourceRef{}, fmt.Errorf("parse source %q: invalid scp url", raw)
+		return SourceRef{}, fmt.Errorf("parse source %q: invalid scp url", rawWithoutFragment)
 	}
 
 	host, path, ok := strings.Cut(rest, ":")
 	if !ok || host == "" || path == "" {
-		return SourceRef{}, fmt.Errorf("parse source %q: invalid scp url", raw)
+		return SourceRef{}, fmt.Errorf("parse source %q: invalid scp url", rawWithoutFragment)
 	}
 
 	path = strings.TrimSuffix(path, ".git")
@@ -77,40 +98,73 @@ func parseSCPSource(raw string) (SourceRef, error) {
 			Raw:             raw,
 			SourceType:      sourceTypeForHost(host),
 			CanonicalSource: path,
-			CloneURL:        raw,
+			CloneURL:        rawWithoutFragment,
+			Ref:             ref,
 		}, nil
 	}
 
 	return SourceRef{
 		Raw:             raw,
 		SourceType:      "git",
-		CanonicalSource: raw,
-		CloneURL:        raw,
+		CanonicalSource: rawWithoutFragment,
+		CloneURL:        rawWithoutFragment,
+		Ref:             ref,
 	}, nil
 }
 
-func parseURLSource(raw string, u *url.URL) (SourceRef, error) {
+func parseURLSource(raw, rawWithoutFragment string, u *url.URL, ref string) (SourceRef, error) {
 	host := strings.ToLower(u.Hostname())
 	path := strings.Trim(strings.TrimSuffix(u.EscapedPath(), ".git"), "/")
 	if path == "" {
-		return SourceRef{}, fmt.Errorf("parse source %q: missing repository path", raw)
+		return SourceRef{}, fmt.Errorf("parse source %q: missing repository path", rawWithoutFragment)
 	}
 
-	if host == "github.com" || host == "gitlab.com" {
+	if host == "github.com" {
+		segments := splitPathSegments(path)
+		if len(segments) != 2 {
+			return SourceRef{}, fmt.Errorf("parse source %q: unsupported github url path", rawWithoutFragment)
+		}
 		return SourceRef{
 			Raw:             raw,
-			SourceType:      sourceTypeForHost(host),
-			CanonicalSource: path,
-			CloneURL:        "https://" + host + "/" + path + ".git",
+			SourceType:      "github",
+			CanonicalSource: strings.Join(segments, "/"),
+			CloneURL:        "https://" + host + "/" + strings.Join(segments, "/") + ".git",
+			Ref:             ref,
+		}, nil
+	}
+
+	if host == "gitlab.com" {
+		if strings.Contains(path, "/-/") {
+			return SourceRef{}, fmt.Errorf("parse source %q: unsupported gitlab url path", rawWithoutFragment)
+		}
+		segments := splitPathSegments(path)
+		if len(segments) < 2 {
+			return SourceRef{}, fmt.Errorf("parse source %q: missing repository path", rawWithoutFragment)
+		}
+		canonicalPath := strings.Join(segments, "/")
+		return SourceRef{
+			Raw:             raw,
+			SourceType:      "gitlab",
+			CanonicalSource: canonicalPath,
+			CloneURL:        "https://" + host + "/" + canonicalPath + ".git",
+			Ref:             ref,
 		}, nil
 	}
 
 	return SourceRef{
 		Raw:             raw,
 		SourceType:      "git",
-		CanonicalSource: raw,
-		CloneURL:        raw,
+		CanonicalSource: rawWithoutFragment,
+		CloneURL:        rawWithoutFragment,
+		Ref:             ref,
 	}, nil
+}
+
+func splitPathSegments(path string) []string {
+	segments := strings.Split(path, "/")
+	return slices.DeleteFunc(segments, func(segment string) bool {
+		return segment == ""
+	})
 }
 
 func sourceTypeForHost(host string) string {

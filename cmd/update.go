@@ -112,9 +112,13 @@ func filterEntriesBySource(entries map[string]lock.Entry, source string) (map[st
 
 	filtered := make(map[string]lock.Entry)
 	for name, entry := range entries {
-		if entry.Source == ref.CanonicalSource {
-			filtered[name] = entry
+		if entry.Source != ref.CanonicalSource {
+			continue
 		}
+		if ref.Ref != "" && entry.Ref != ref.Ref {
+			continue
+		}
+		filtered[name] = entry
 	}
 
 	return filtered, nil
