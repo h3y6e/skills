@@ -3,6 +3,7 @@ package skill
 import (
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -28,6 +29,16 @@ func ParseSource(raw string) (SourceRef, error) {
 	}
 
 	rawWithoutFragment, ref := splitSourceFragment(raw)
+
+	if looksLikeLocalPath(rawWithoutFragment) {
+		return SourceRef{
+			Raw:             raw,
+			SourceType:      "local",
+			CanonicalSource: filepath.Clean(rawWithoutFragment),
+			CloneURL:        filepath.Clean(rawWithoutFragment),
+			Ref:             ref,
+		}, nil
+	}
 
 	if shorthandPattern.MatchString(rawWithoutFragment) {
 		return SourceRef{
@@ -55,7 +66,7 @@ func ParseSource(raw string) (SourceRef, error) {
 	if u.Scheme == "file" {
 		return SourceRef{
 			Raw:             raw,
-			SourceType:      "git",
+			SourceType:      "local",
 			CanonicalSource: rawWithoutFragment,
 			CloneURL:        rawWithoutFragment,
 			Ref:             ref,
@@ -175,10 +186,19 @@ func sourceTypeForHost(host string) string {
 	return "github"
 }
 
+func looksLikeLocalPath(raw string) bool {
+	if filepath.IsAbs(raw) {
+		return true
+	}
+
+	return raw == "." || raw == ".." ||
+		strings.HasPrefix(raw, "./") || strings.HasPrefix(raw, "../")
+}
+
 // SupportedSourceType reports whether the source type can be cloned/updated.
 func SupportedSourceType(sourceType string) bool {
 	switch sourceType {
-	case "github", "gitlab", "git":
+	case "github", "gitlab", "git", "local":
 		return true
 	default:
 		return false

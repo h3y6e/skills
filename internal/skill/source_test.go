@@ -143,7 +143,7 @@ func TestParseSource(t *testing.T) {
 			raw:  "file:///tmp/bare-repo",
 			want: skill.SourceRef{
 				Raw:             "file:///tmp/bare-repo",
-				SourceType:      "git",
+				SourceType:      "local",
 				CanonicalSource: "file:///tmp/bare-repo",
 				CloneURL:        "file:///tmp/bare-repo",
 			},
@@ -153,10 +153,31 @@ func TestParseSource(t *testing.T) {
 			raw:  "file:///tmp/bare-repo#topic",
 			want: skill.SourceRef{
 				Raw:             "file:///tmp/bare-repo#topic",
-				SourceType:      "git",
+				SourceType:      "local",
 				CanonicalSource: "file:///tmp/bare-repo",
 				CloneURL:        "file:///tmp/bare-repo",
 				Ref:             "topic",
+			},
+		},
+		{
+			name: "absolute local path",
+			raw:  "/tmp/spec-skills",
+			want: skill.SourceRef{
+				Raw:             "/tmp/spec-skills",
+				SourceType:      "local",
+				CanonicalSource: "/tmp/spec-skills",
+				CloneURL:        "/tmp/spec-skills",
+			},
+		},
+		{
+			name: "relative local path",
+			raw:  "../spec-skills#feature/install",
+			want: skill.SourceRef{
+				Raw:             "../spec-skills#feature/install",
+				SourceType:      "local",
+				CanonicalSource: "../spec-skills",
+				CloneURL:        "../spec-skills",
+				Ref:             "feature/install",
 			},
 		},
 	}
