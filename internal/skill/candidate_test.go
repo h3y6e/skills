@@ -2,6 +2,7 @@ package skill_test
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -525,11 +526,16 @@ func TestAggregateUpdateCandidates(t *testing.T) {
 		t.Parallel()
 
 		srcDir := t.TempDir()
+		localSrcDir := t.TempDir()
 		writeFiles(t, srcDir, map[string]string{
 			"skills/supported-skill/SKILL.md": "# Supported\n",
 		})
+		writeFiles(t, localSrcDir, map[string]string{
+			"skills/local-skill/SKILL.md": "# Local\n",
+		})
 
 		discovered, _ := skill.DiscoverSkills(srcDir)
+		localDiscovered, _ := skill.DiscoverSkills(localSrcDir)
 
 		entries := map[string]lock.Entry{
 			"supported-skill": {
@@ -538,9 +544,9 @@ func TestAggregateUpdateCandidates(t *testing.T) {
 				ComputedHash: discovered[0].ComputedHash,
 			},
 			"local-skill": {
-				Source:       "/home/user/my-skills",
+				Source:       localSrcDir,
 				SourceType:   "local",
-				ComputedHash: "localhash",
+				ComputedHash: localDiscovered[0].ComputedHash,
 			},
 			"wellknown-skill": {
 				Source:       "mintlify/docs",
@@ -558,6 +564,9 @@ func TestAggregateUpdateCandidates(t *testing.T) {
 			if source == "h3y6e/spec-skills" {
 				return srcDir, nil
 			}
+			if source == localSrcDir {
+				return localSrcDir, nil
+			}
 			t.Fatalf("unexpected clone for source %q", source)
 			return "", nil
 		}
@@ -567,15 +576,16 @@ func TestAggregateUpdateCandidates(t *testing.T) {
 			t.Fatalf("AggregateUpdateCandidates() error = %v", err)
 		}
 
-		if len(candidates) != 1 {
-			t.Fatalf("expected 1 candidate, got %d", len(candidates))
+		if len(candidates) != 2 {
+			t.Fatalf("expected 2 candidates, got %d", len(candidates))
 		}
-		if candidates[0].SkillName != "supported-skill" {
-			t.Errorf("candidate SkillName = %q, want %q", candidates[0].SkillName, "supported-skill")
+		candidateNames := []string{candidates[0].SkillName, candidates[1].SkillName}
+		if !slices.Equal(candidateNames, []string{"local-skill", "supported-skill"}) {
+			t.Errorf("candidate names = %v, want %v", candidateNames, []string{"local-skill", "supported-skill"})
 		}
 
-		if len(skipped) != 3 {
-			t.Fatalf("expected 3 skipped, got %d", len(skipped))
+		if len(skipped) != 2 {
+			t.Fatalf("expected 2 skipped, got %d", len(skipped))
 		}
 
 		skippedByName := map[string]skill.SkippedEntry{}
@@ -583,7 +593,6 @@ func TestAggregateUpdateCandidates(t *testing.T) {
 			skippedByName[s.SkillName] = s
 		}
 		wantSkipped := map[string]string{
-			"local-skill":     "local",
 			"wellknown-skill": "well-known",
 			"npm-skill":       "node_modules",
 		}
