@@ -46,10 +46,6 @@ Skills are installed to `.agents/skills/` by default (configurable with `-d`). T
 skills-lock.json
 ```
 
-### Automated updates
-
-See [h3y6e/dotfiles](https://github.com/h3y6e/dotfiles/blob/main/.github/workflows/skills.yaml) for a working example.
-
 ## License
 
 [MIT](LICENSE)
